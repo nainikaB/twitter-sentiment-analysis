@@ -1,0 +1,153 @@
+---
+title: "Twitter Sentimental Analysis"
+output: html_notebook
+---
+
+library(rtweet)
+# plotting and pipes - tidyverse!
+library(ggplot2)
+library(dplyr)
+# text mining library
+library(tidytext)
+library(tm)
+library(syuzhet)
+library(lubridate)
+library(scales)
+library(reshape2)
+
+
+appname <- "whats-my-mood"
+
+key <- ""
+
+
+secret <- ""
+
+access_token <- ""
+
+access_secret <- ""
+
+twitter_token <- create_token(
+  app = appname,
+  consumer_key = key,
+  consumer_secret = secret,
+  access_token = access_token,
+  access_secret = access_secret)
+
+users <- c("NainikaBaliga")
+Nainika_tweets <- lookup_users(users)
+
+## preview users data
+
+Nainika_tweets
+
+# extract most recent tweets data from the famous tweeters
+tweets_data(Nainika_tweets)
+
+whats_my_mood <- get_timelines(c("NainikaBaliga"), n = 982)
+whats_my_mood
+
+corpus <- iconv(whats_my_mood$text)
+corpus <- Corpus(VectorSource(corpus))
+inspect(corpus[1:5])
+
+
+
+//clean text 
+
+corpus <- tm_map(corpus, tolower)
+inspect(corpus[1:982])
+
+
+# remove punctuations 
+
+
+corpus <- tm_map(corpus, removePunctuation)
+inspect(corpus[1:980])
+
+# remove numbers 
+corpus <- tm_map(corpus, removeNumbers)
+inspect(corpus[1:980]) 
+
+# remove stop words 
+cleanset <- tm_map(corpus, removeWords, stopwords('english'))
+inspect(cleanset) 
+
+#remove \n
+removeURL <- function(x) gsub("\n", " ", x)
+cleanset <- tm_map(cleanset, content_transformer(removeURL))
+inspect(cleanset[1:980]) 
+
+# remove unwanted characters
+removeURL <- function(x) gsub('\\p{So}|\\p{Cn}', ' ', x, perl = TRUE)
+cleanset <- tm_map(cleanset, content_transformer(removeURL))
+inspect(cleanset[1:980]) 
+
+
+removeURL <- function(x) gsub("http[[:alnum:]]", " ", x)
+cleanset <- tm_map(cleanset, content_transformer(removeURL))
+inspect(cleanset[1:980]) 
+
+removeURL <- function(x) gsub("tco", "", x)
+cleanset <- tm_map(cleanset, content_transformer(removeURL))
+inspect(cleanset[1:980]) 
+
+# remove punctuation
+removeURL <- function(x) gsub("[[:punct:]]", "", x)
+cleanset <- tm_map(cleanset, content_transformer(removeURL))
+inspect(cleanset[1:980]) 
+
+ # remove whitespaces
+cleanset <- tm_map(cleanset, stripWhitespace)
+inspect(cleanset[1:980]) 
+
+
+tdm <- TermDocumentMatrix(cleanset)
+tdm
+tdm <- as.matrix(tdm)
+tdm[1:10 , 1: 20]
+
+my_mood <- rowSums(tdm)
+my_mood <- subset(my_mood, my_mood>= 30)
+
+my_mood
+barplot(my_mood, las = 2, col =(rainbow(20)))
+
+library(wordcloud2)
+my_mood <- data.frame(names(my_mood), my_mood)
+colnames(my_mood) <- c('word', 'freq')
+wordcloud2(my_mood, size = 0.4, shape = "circle")
+
+
+
+get_sentiments <- get_nrc_sentiment(whats_my_mood$text)
+get_sentiments
+barplot(colSums(s),
+        las = 2, 
+        col = rainbow(10), 
+        ylab = "sentiment",
+        main = "my tweets")
+
+
+library(quickPlot)
+
+#transpose
+td<-data.frame(t(get_sentiments))
+#The function rowSums computes column sums across rows for each level of a grouping variable.
+td_new <- data.frame(rowSums(td))
+td_new
+#Transformation and cleaning
+names(td_new)[1] <- "Count"
+
+td_new <- cbind("sentiment" = rownames(td_new), td_new)
+td_new
+rownames(td_new) <- NULL
+td_new
+ sentimentAnalysis <- td_new
+sentimentAnalysis
+
+
+sentimentAnalysis %>%
+   ggplot(aes(x=sentiment, y=Count, fill=sentiment)) + geom_col() + scale_fill_brewer(palette = "RdYlBu")  + theme_minimal() + ggtitle("Sentimental Analysis with my tweets") + labs(x = "sentiment", y = "count ")
+
+
